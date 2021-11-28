@@ -3,7 +3,8 @@ package abc;
 /**
  * This class represents the Control Unit for the
  * ABC Machine
- *
+ * @author Regina Vanata
+ * @version 1.0
  */
 public class ControlUnit {
 
@@ -37,21 +38,16 @@ public class ControlUnit {
      *  3. Increment the Program Counter (PC) register
      */
     public void fetch() {
-        // get the value in the pc register
-        byte pc = machine.getPc();
-
-        // retrieve from the memory array the instructions at the pc index
-        short[] mem = machine.getMemory();
-
         // retrieve instruction from the memory array at pc index
-        short instruction = mem[pc];
+        short instruction = machine.getMemory()[machine.getPc()];
 
-        // place instruction into instruction register
+        // set instruction into instruction register
         machine.setIr(instruction);
 
-        // increment pc value and set it into the pc register
-        pc++;
-        machine.setPc(pc);
+        // increment pc and set it into the pc register
+        //pc++;
+        //machine.setPc(++pc);
+        machine.setPc((byte)(machine.getPc() + 1));
 
     }
 
@@ -61,78 +57,84 @@ public class ControlUnit {
      * helper methods for use by this method.
      */
     public void decodeExecuteStore() {
-        // IR - 101 000 000 000 1110
-        // get opcode (how?)
-        short ir = machine.getIr();
+        // opcode values
+        final short ADD=0,SUB=1,MULT=2,DIV=3,STORE=4,LOAD=5,BRANCH=6,JUMP=7;
 
-        // mask constant for opcodes
-        // 111 000 000 000 0000
-        short condition = (short)(ir & 0b111_000_000_000_0000);
-        // we need registers array
+        // get the registers needed for all instructions
         short[] reg = machine.getRegisters();
-        short src1 = isolateThreeBitsIr(10);
-        short src2 = isolateThreeBitsIr(7);
-        short dest = isolateThreeBitsIr(4);
-        short opCode = isolateThreeBitsIr(13);
 
-        // make decision
-        switch(condition){
-            case 0: //ADD
-                //do add stuff
-                // we need src1
-                // shift ir value
-                //reg[dest];
-                ir = (short)(machine.getIr() >>> 10);
-                src1 = (short)(ir & 0b111);
+        // decode the instruction
+        short src1 = isolateThreeBitsIR(10);
+        short src2 = isolateThreeBitsIR(7);
+        short dest = isolateThreeBitsIR(4);
+        short mem = machine.getMemory()[isolateAddressIR()];
+        short opCode = isolateThreeBitsIR(13);
 
-                // get src2 register
-                ir = (short)(machine.getIr() >>> 7);
-                src2 = (short)(ir & 0b111);
-
-                // get dest register
-                ir = (short)(machine.getIr() >>> 4);
-                dest = (short)(ir & 0b111);
-
-                // add values in src1 and src2 registers
-                // pace sum in dest register
-                // make use of ALU
-                reg[dest] = machine.getAlu().operate(reg[src1], Operator.ADD, reg[src2]);
+        // based on the opCode execute the correct action
+        switch(opCode) {
+            case ADD:
+                // add values in src1 and src2 registers and place sum in dest register
+                reg[dest] = machine.getAlu().operate(reg[src1],Operator.ADD,reg[src2]);
                 break;
-            case (short)(0b101_000_000_000_0000): //LOAD
-                //do load stuff
-                // we need address - last 4 bits right to left
-                short address = (short)(ir & 0b1111);
-                // we need src1
-                // shift ir value
-                ir = (short)(machine.getIr() >>> 10);
-                src1 = (short)(ir & 0b111);
 
-                // we need memory array
-                short[] mem = machine.getMemory();
-
-                //another to do reg[src1] = mem[addr]
-                reg[src1] = mem[address];
+            case LOAD:
+                // load from memory to a register
+                reg[src1] = machine.getMemory()[isolateAddressIR()];
                 break;
-        }
+
+            case BRANCH:
+                branch(src1);
+                break;
+
+            case SUB:
+                reg[dest] = machine.getAlu().operate(reg[src1],Operator.SUB,reg[src2]);
+                break;
+
+            case MULT:
+                reg[dest] = machine.getAlu().operate(reg[src1],Operator.MULT,reg[src2]);
+                break;
+
+            case DIV:
+                reg[dest] = machine.getAlu().operate(reg[src1],Operator.DIV,reg[src2]);
+                break;
+
+            case STORE:
+                machine.getMemory()[isolateAddressIR()] = reg[src1];
+                break;
+            case JUMP:
+                machine.setPc((byte) isolateAddressIR());
+                break;
+
+
+        } // end of switch
 
     }
 
-    private short isolateThreeBitsIr(int shift){
+    private short isolateThreeBitsIR(int shift){
         short ir = (short) (machine.getIr() >>> shift);
         return (short) (ir & 0b111);
     }
 
-    private short isolateAddressIR() {
+    private short isolateAddressIR(){
         return (short) (machine.getIr() & 0b1111);
     }
 
-    //Branch program if and ALU status match
+    // Branch program if and ALU status match
+    private void branch(short nzp) {
+        if ( nzp == 0b100 && machine.getAlu().getStatus() == Nzp.NEGATIVE ){
+            // update the program counter to the address in the IR
+            machine.setPc((byte) isolateAddressIR());
+        }
+        // if nzp = 0b010 and status = Nzp.ZERO, branch
+        if( nzp == 0b010 && machine.getAlu().getStatus() == Nzp.ZERO ) {
+            machine.setPc((byte) isolateAddressIR());
+        }
 
-
-
-
-
-
+        // if nzp = 0b001 and status = Nzp.POSITIVE, branch
+        if( nzp == 0b001 && machine.getAlu().getStatus() == Nzp.POSITIVE ) {
+            machine.setPc((byte) isolateAddressIR());
+        }
+    }
     /**
      *
      * @return true if next instruction contains all zeros, otherwise false

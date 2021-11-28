@@ -7,7 +7,7 @@ public class ABCDriver
 	public static void main(String[] args)
 	{
 		//create a new ABCMachine and pass it a new program to run
-		ABCMachine mach = new ABCMachine("programs/program1.abc");
+		ABCMachine mach = new ABCMachine("programs/program2.abc");
 		mach.runProgram();
 		//print out the registers and memory after the program runs
 		System.out.println("Register dump");
